@@ -1,0 +1,6 @@
+{
+    "go.testEnvFile": "${workspaceFolder}/.env",
+    "go.lintFlags": ["--fast"],
+    "go.lintOnSave": "workspace",
+    "go.lintTool": "golangci-lint"
+}
