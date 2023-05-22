@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	exchangeName     = "exchange"
+	exchangeName     = "taskExchange"
 	eventHandlerType = "eventHandler"
 	prefetchCount    = 10
 	eventQueue       = "eventQueue"
@@ -94,7 +94,7 @@ func (c *Consumer) Listen(ctx context.Context, eventHandlerType string) error {
 	mssgs, err := ch.Consume(
 		q.Name,
 		"consumer",
-		false,
+		true,
 		false,
 		false,
 		false,
@@ -120,5 +120,18 @@ func (c *Consumer) Listen(ctx context.Context, eventHandlerType string) error {
 	}
 	gCtx.Done()
 
-	return nil
+	if !ch.IsClosed() {
+		err = ch.Cancel("consumer", false)
+
+		if err != nil {
+			return err
+		}
+		err = ch.Close()
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return g.Wait()
 }
