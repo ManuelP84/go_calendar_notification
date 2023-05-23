@@ -7,7 +7,9 @@
 package main
 
 import (
+	"github.com/ManuelP84/calendar_notification/business/task/handlers"
 	"github.com/ManuelP84/calendar_notification/infra/app"
+	"github.com/ManuelP84/calendar_notification/infra/mongo/task"
 	"github.com/ManuelP84/calendar_notification/infra/rabbit/consumer"
 )
 
@@ -17,6 +19,9 @@ func CreateApp() *app.App {
 	appSettings := app.GetAppSettings()
 	rabbitSettings := app.GetRabbitSettings()
 	consumerConsumer := consumer.NewConsumer(rabbitSettings)
-	appApp := app.NewApp(appSettings, consumerConsumer)
+	mongoDbSettings := app.GetMongoSettings()
+	mongoRepository := task.NewMongoRepository(mongoDbSettings)
+	taskHandlers := handlers.NewTaskHandlers(mongoRepository)
+	appApp := app.NewApp(appSettings, consumerConsumer, taskHandlers)
 	return appApp
 }
