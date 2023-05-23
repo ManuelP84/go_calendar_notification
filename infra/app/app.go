@@ -23,6 +23,8 @@ func NewApp(settings *AppSettings, busConsumer *consumer.Consumer) *App {
 func (app *App) Run(ctx context.Context) error {
 	g, _ := errgroup.WithContext(ctx)
 
+	app.BusConsumer.AddEventHandler("taskCreated", func(ctx context.Context, s string) error { log.Println("Handling task created!"); return nil })
+
 	g.Go(func() error {
 		if err := app.BusConsumer.Run(ctx); err != nil {
 			return err

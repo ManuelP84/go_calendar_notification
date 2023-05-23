@@ -21,7 +21,7 @@ const (
 	exchangeType     = "direct"
 )
 
-type EventHandlerFunc func(context.Context, interface{}) error
+type EventHandlerFunc func(context.Context, string) error
 
 type Consumer struct {
 	connection    *amqp.Connection
@@ -41,6 +41,31 @@ func NewConsumer(settings *rabbit.RabbitSettings) *Consumer {
 
 func (c *Consumer) AddEventHandler(event string, handler EventHandlerFunc) {
 	c.eventHandlers[event] = handler
+}
+
+func (c *Consumer) HandleEvent(ctx context.Context, data amqp.Delivery, semaphore chan bool) error {
+	defer func() {
+		<-semaphore
+	}()
+
+	strData := string(data.Body)
+
+	handler, exists := c.eventHandlers[strData]
+
+	if !exists {
+		log.Println("message without a handler")
+		err := data.Nack(false, true)
+
+		return err
+	}
+
+	err := handler(ctx, strData)
+
+	if err != nil {
+		log.Println("error handling data...")
+	}
+
+	return err
 }
 
 func (c *Consumer) Run(ctx context.Context) error {
@@ -123,14 +148,15 @@ func (c *Consumer) Listen(ctx context.Context, eventHandlerType string) error {
 		semaphore <- true
 
 		g.Go(func() error {
-			log.Println(string(delivery.Body))
-			return nil
+			// log.Println(string(delivery.Body))
+			// return nil
+			return c.HandleEvent(ctx, delivery, semaphore)
 		})
 	}
 	gCtx.Done()
 
 	if !ch.IsClosed() {
-		err = ch.Cancel("consumer", false)
+		err = ch.Cancel(consumerName, false)
 
 		if err != nil {
 			return err
