@@ -12,46 +12,38 @@ import (
 
 const (
 	exchangeName     = "taskExchange"
+	consumerName     = "taskEventConsumer"
 	eventHandlerType = "eventHandler"
+	routingKey       = "taskEvents"
 	prefetchCount    = 10
-	eventQueue       = "eventQueue"
+	queueName        = "taskQueue"
 	concurrency      = 5
+	exchangeType     = "direct"
 )
 
+type EventHandlerFunc func(context.Context, interface{}) error
+
 type Consumer struct {
-	connection *amqp.Connection
+	connection    *amqp.Connection
+	eventHandlers map[string]EventHandlerFunc
 }
 
 func NewConsumer(settings *rabbit.RabbitSettings) *Consumer {
-	addr := fmt.Sprintf("amqp://%s:%s@%s:%s", settings.User, settings.Password, settings.Host, settings.Port)
+	addr := fmt.Sprintf("amqp://%s:%s@%s:%s/", settings.User, settings.Password, settings.Host, settings.Port)
 	conn, err := amqp.Dial(addr)
 
 	if err != nil {
 		log.Panicf("%s: %s", "Failed to connect to RabbitMQ", err)
 	}
 
-	return &Consumer{conn}
+	return &Consumer{conn, map[string]EventHandlerFunc{}}
+}
+
+func (c *Consumer) AddEventHandler(event string, handler EventHandlerFunc) {
+	c.eventHandlers[event] = handler
 }
 
 func (c *Consumer) Run(ctx context.Context) error {
-	ch, err := c.connection.Channel()
-	if err != nil {
-		log.Panicf("%s: %s", "Failed to open a channel", err)
-	}
-
-	err = ch.ExchangeDeclare(
-		exchangeName,
-		"fanout",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-
-	if err != nil {
-		log.Panicf("%s: %s", "Failed to declare an exchange", err)
-	}
 
 	g, groupCtx := errgroup.WithContext(ctx)
 
@@ -63,15 +55,28 @@ func (c *Consumer) Run(ctx context.Context) error {
 
 func (c *Consumer) Listen(ctx context.Context, eventHandlerType string) error {
 	ch, err := c.connection.Channel()
-
 	if err != nil {
 		log.Panicf("%s: %s", "Failed to open a channel", err)
+	}
+
+	err = ch.ExchangeDeclare(
+		exchangeName,
+		exchangeType,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+
+	if err != nil {
+		log.Panicf("%s: %s", "Failed to declare an exchange", err)
 	}
 
 	err = ch.Qos(prefetchCount, 0, false)
 
 	q, err := ch.QueueDeclare(
-		eventQueue,
+		queueName,
 		false,
 		false,
 		true,
@@ -79,9 +84,13 @@ func (c *Consumer) Listen(ctx context.Context, eventHandlerType string) error {
 		nil,
 	)
 
+	if err != nil {
+		log.Panicf("%s: %s", "Failed to declare an queue", err)
+	}
+
 	err = ch.QueueBind(
 		q.Name,
-		"",
+		routingKey,
 		exchangeName,
 		false,
 		nil,
@@ -92,8 +101,8 @@ func (c *Consumer) Listen(ctx context.Context, eventHandlerType string) error {
 	}
 
 	mssgs, err := ch.Consume(
-		q.Name,
-		"consumer",
+		queueName,
+		consumerName,
 		true,
 		false,
 		false,
