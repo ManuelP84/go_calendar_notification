@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/ManuelP84/calendar_notification/infra/mongo"
 	"github.com/ManuelP84/calendar_notification/infra/rabbit"
 	"github.com/kelseyhightower/envconfig"
 )
@@ -9,6 +10,7 @@ var instance *AppSettings
 
 type AppSettings struct {
 	Rabbit *rabbit.RabbitSettings
+	Mongo  *mongo.MongoDbSettings
 }
 
 func loadAppSettings() *AppSettings {
@@ -30,4 +32,8 @@ func GetAppSettings() *AppSettings {
 
 func GetRabbitSettings() *rabbit.RabbitSettings {
 	return loadAppSettings().Rabbit
+}
+
+func GetMongoSettings() *mongo.MongoDbSettings {
+	return loadAppSettings().Mongo
 }
