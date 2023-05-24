@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/ManuelP84/calendar_notification/domain/task/events"
 	"github.com/ManuelP84/calendar_notification/infra/rabbit"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"golang.org/x/sync/errgroup"
@@ -21,7 +22,7 @@ const (
 	exchangeType     = "direct"
 )
 
-type EventHandlerFunc func(context.Context, string) error
+type EventHandlerFunc func(context.Context, events.TaskEvent) error
 
 type Consumer struct {
 	connection    *amqp.Connection
@@ -48,9 +49,13 @@ func (c *Consumer) HandleEvent(ctx context.Context, data amqp.Delivery, semaphor
 		<-semaphore
 	}()
 
-	strData := string(data.Body)
+	taskEvent, err := rabbit.Deserialize(data.Body)
 
-	handler, exists := c.eventHandlers[strData]
+	if err != nil {
+		log.Panicf("%s: %s", "Failed to deserialize message", err)
+	}
+
+	handler, exists := c.eventHandlers[taskEvent.EventType]
 
 	if !exists {
 		log.Println("message without a handler")
@@ -59,7 +64,7 @@ func (c *Consumer) HandleEvent(ctx context.Context, data amqp.Delivery, semaphor
 		return err
 	}
 
-	err := handler(ctx, strData)
+	err = handler(ctx, taskEvent)
 
 	if err != nil {
 		log.Println("error handling data...")

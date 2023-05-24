@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/ManuelP84/calendar_notification/domain/task/events"
 	mongoSettings "github.com/ManuelP84/calendar_notification/infra/mongo"
 )
 
@@ -39,11 +40,16 @@ func NewMongoRepository(settings *mongoSettings.MongoDbSettings) *MongoRepositor
 	return &MongoRepository{db, col}
 }
 
-func (mongo *MongoRepository) InsertEvent(ctx context.Context, eventType string) error {
+func (mongo *MongoRepository) InsertEvent(ctx context.Context, event events.TaskEvent) error {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	_, err := mongo.collection.InsertOne(ctxTimeout, bson.D{{Key: "event", Value: eventType}})
+	_, err := mongo.collection.InsertOne(ctxTimeout, bson.D{
+		{Key: "type", Value: event.EventType},
+		{Key: "taskID", Value: event.Task.Id},
+		{Key: "title", Value: event.Task.Title},
+		{Key: "description", Value: event.Task.Description},
+	})
 
 	if err != nil {
 		return err
