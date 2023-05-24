@@ -5,19 +5,19 @@ import (
 	"log"
 
 	"github.com/ManuelP84/calendar_notification/business/task/handlers"
-	"github.com/ManuelP84/calendar_notification/domain/task"
+	"github.com/ManuelP84/calendar_notification/domain/gateways/bus/consumer"
 	"github.com/ManuelP84/calendar_notification/domain/task/events"
-	"github.com/ManuelP84/calendar_notification/infra/rabbit/consumer"
+	"github.com/ManuelP84/calendar_notification/infra/config"
 	"golang.org/x/sync/errgroup"
 )
 
 type App struct {
-	Settings     *AppSettings
-	BusConsumer  *consumer.Consumer
+	Settings     *config.AppSettings
+	BusConsumer  consumer.TaskConsumer
 	TaskHandlers *handlers.TaskHandlers
 }
 
-func NewApp(settings *AppSettings, busConsumer *consumer.Consumer, taskHandlers *handlers.TaskHandlers) *App {
+func NewApp(settings *config.AppSettings, busConsumer consumer.TaskConsumer, taskHandlers *handlers.TaskHandlers) *App {
 	return &App{
 		Settings:     settings,
 		BusConsumer:  busConsumer,
@@ -28,7 +28,7 @@ func NewApp(settings *AppSettings, busConsumer *consumer.Consumer, taskHandlers 
 func (app *App) Run(ctx context.Context) error {
 	g, _ := errgroup.WithContext(ctx)
 
-	app.BusConsumer.AddEventHandler(task.TaskCreatedEvent, func(ctx context.Context, e events.TaskEvent) error {
+	app.BusConsumer.AddEventHandler(events.TaskCreatedEvent, func(ctx context.Context, e events.TaskEvent) error {
 		log.Println("Handling task created event...")
 		return app.TaskHandlers.StoreEvent.StoreTaskEvent(ctx, e)
 	})

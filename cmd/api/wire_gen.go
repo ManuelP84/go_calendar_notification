@@ -7,8 +7,9 @@
 package main
 
 import (
+	"github.com/ManuelP84/calendar_notification/app"
 	"github.com/ManuelP84/calendar_notification/business/task/handlers"
-	"github.com/ManuelP84/calendar_notification/infra/app"
+	"github.com/ManuelP84/calendar_notification/infra/config"
 	"github.com/ManuelP84/calendar_notification/infra/mongo/task"
 	"github.com/ManuelP84/calendar_notification/infra/rabbit/consumer"
 )
@@ -16,10 +17,10 @@ import (
 // Injectors from wire.go:
 
 func CreateApp() *app.App {
-	appSettings := app.GetAppSettings()
-	rabbitSettings := app.GetRabbitSettings()
+	appSettings := config.GetAppSettings()
+	rabbitSettings := config.GetRabbitSettings()
 	consumerConsumer := consumer.NewConsumer(rabbitSettings)
-	mongoDbSettings := app.GetMongoSettings()
+	mongoDbSettings := config.GetMongoSettings()
 	mongoRepository := task.NewMongoRepository(mongoDbSettings)
 	taskHandlers := handlers.NewTaskHandlers(mongoRepository)
 	appApp := app.NewApp(appSettings, consumerConsumer, taskHandlers)

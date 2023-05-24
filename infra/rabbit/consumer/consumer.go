@@ -22,11 +22,9 @@ const (
 	exchangeType     = "direct"
 )
 
-type EventHandlerFunc func(context.Context, events.TaskEvent) error
-
 type Consumer struct {
 	connection    *amqp.Connection
-	eventHandlers map[string]EventHandlerFunc
+	eventHandlers events.EventHandlers
 }
 
 func NewConsumer(settings *rabbit.RabbitSettings) *Consumer {
@@ -37,40 +35,11 @@ func NewConsumer(settings *rabbit.RabbitSettings) *Consumer {
 		log.Panicf("%s: %s", "Failed to connect to RabbitMQ", err)
 	}
 
-	return &Consumer{conn, map[string]EventHandlerFunc{}}
+	return &Consumer{conn, map[string]events.EventHandlerFunc{}}
 }
 
-func (c *Consumer) AddEventHandler(event string, handler EventHandlerFunc) {
+func (c *Consumer) AddEventHandler(event string, handler events.EventHandlerFunc) {
 	c.eventHandlers[event] = handler
-}
-
-func (c *Consumer) HandleEvent(ctx context.Context, data amqp.Delivery, semaphore chan bool) error {
-	defer func() {
-		<-semaphore
-	}()
-
-	taskEvent, err := rabbit.Deserialize(data.Body)
-
-	if err != nil {
-		log.Panicf("%s: %s", "Failed to deserialize message", err)
-	}
-
-	handler, exists := c.eventHandlers[taskEvent.EventType]
-
-	if !exists {
-		log.Println("message without a handler")
-		err := data.Nack(false, true)
-
-		return err
-	}
-
-	err = handler(ctx, taskEvent)
-
-	if err != nil {
-		log.Println("error handling data...")
-	}
-
-	return err
 }
 
 func (c *Consumer) Run(ctx context.Context) error {
@@ -78,6 +47,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 	g, groupCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
+		//1. Gorutine to listen event types
 		return c.Listen(groupCtx, eventHandlerType)
 	})
 	return g.Wait()
@@ -153,9 +123,7 @@ func (c *Consumer) Listen(ctx context.Context, eventHandlerType string) error {
 		semaphore <- true
 
 		g.Go(func() error {
-			// log.Println(string(delivery.Body))
-			// return nil
-			return c.HandleEvent(ctx, delivery, semaphore)
+			return rabbit.HandleEvent(ctx, delivery, semaphore, c.eventHandlers)
 		})
 	}
 	gCtx.Done()

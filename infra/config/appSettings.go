@@ -1,4 +1,4 @@
-package app
+package config
 
 import (
 	"github.com/ManuelP84/calendar_notification/infra/mongo"

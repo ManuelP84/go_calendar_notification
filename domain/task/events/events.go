@@ -1,4 +1,4 @@
-package task
+package events
 
 const (
 	TaskCreatedEvent = "taskCreated"
